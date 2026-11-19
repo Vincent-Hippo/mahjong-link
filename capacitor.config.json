@@ -1,0 +1,8 @@
+{
+  "appId": "com.vincenthippo.mahjonglink",
+  "appName": "麻將連連看",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
