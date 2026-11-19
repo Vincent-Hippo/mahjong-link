@@ -1,0 +1,15 @@
+{
+  "name": "麻將連連看",
+  "short_name": "連連看",
+  "description": "長輩友善的麻將連連看：三種難度、提示與洗牌，不計時慢慢玩。",
+  "lang": "zh-Hant",
+  "start_url": "./mahjong-link.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1d5c3f",
+  "theme_color": "#1d6a44",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

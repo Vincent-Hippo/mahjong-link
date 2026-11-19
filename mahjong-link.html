@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d6a44">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>麻將連連看 · 長輩版</title>
+<style>
+:root{
+  --paper:#f7f2e8; --ink:#2b2620; --ink2:#6b6154; --line:#d8cfbf;
+  --gold:#a87b2f; --red:#a83c2f; --green:#3f7d4e; --felt:#1d5c3f;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--paper);
+  background-image:radial-gradient(1200px 700px at 50% -10%, #fffaf0 0%, var(--paper) 60%);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei","Noto Sans TC",sans-serif;
+  font-size:18px;line-height:1.5;
+  display:flex;justify-content:center;
+  -webkit-user-select:none;user-select:none;
+}
+#app{width:min(980px,100vw);padding:18px 16px 30px;min-height:100vh}
+h1{font-size:30px;letter-spacing:.12em;text-align:center}
+.sub{text-align:center;color:var(--ink2);font-size:15px;margin-top:6px}
+.sec{margin-top:22px}
+.sec h2{font-size:17px;color:var(--ink2);letter-spacing:.1em;margin-bottom:10px;font-weight:600}
+.grid-btns{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.opt{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;
+  background:#fffdf7;border:2px solid var(--line);border-radius:14px;
+  font-size:19px;color:var(--ink);cursor:pointer;font-family:inherit;text-align:left;
+}
+.opt .big{font-size:30px;line-height:1}
+.opt small{display:block;color:var(--ink2);font-size:13px;margin-top:2px}
+.opt.sel{border-color:var(--gold);background:#fdf6e3;box-shadow:0 2px 8px rgba(168,123,47,.18)}
+.opt:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.toggles{display:flex;flex-direction:column;gap:8px}
+.tg{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fffdf7;border:2px solid var(--line);border-radius:12px;font-size:17px;cursor:pointer;font-family:inherit;color:var(--ink);text-align:left;width:100%}
+.tg .sw{margin-left:auto;width:52px;height:30px;border-radius:15px;background:#cfc6b4;position:relative;transition:background .2s;flex:none}
+.tg .sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.tg.on .sw{background:var(--green)}
+.tg.on .sw::after{left:25px}
+.start{
+  width:100%;margin-top:24px;padding:18px;font-size:24px;letter-spacing:.2em;text-indent:.2em;
+  background:linear-gradient(180deg,#c04a3a,var(--red));color:#fff;border:0;border-radius:16px;
+  cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(168,60,47,.35);
+}
+/* ---------- game ---------- */
+#game{display:none}
+.hud{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.hud .btn{
+  padding:10px 16px;font-size:16px;border:2px solid var(--line);background:#fffdf7;color:var(--ink);
+  border-radius:10px;cursor:pointer;font-family:inherit;letter-spacing:.05em;
+}
+.hud .btn:disabled{opacity:.4;cursor:default}
+.stat{font-size:15px;color:var(--ink2);text-align:center;width:100%}
+#felt{
+  background:radial-gradient(120% 140% at 50% 0%, #2a7150 0%, var(--felt) 55%, #164a32 100%);
+  border-radius:20px;padding:18px;box-shadow:inset 0 2px 20px rgba(0,0,0,.45), 0 6px 18px rgba(0,0,0,.25);
+  position:relative;
+}
+#board{display:grid;gap:6px;position:relative}
+#pathsvg{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:5}
+.tile{
+  position:relative;border:0;padding:0;cursor:pointer;background:none;touch-action:manipulation;
+  aspect-ratio:3/4;transition:transform .15s, opacity .35s;
+}
+.tile .body{
+  position:absolute;inset:0;border-radius:10px;
+  background:linear-gradient(160deg,#fffdf4 0%,#f2ecd9 70%,#e4dcbe 100%);
+  border:1px solid #c9bf9f;
+  box-shadow:0 3px 0 #b7ac8b, 0 5px 8px rgba(0,0,0,.35), inset 0 1px 0 #fff;
+  display:flex;align-items:center;justify-content:center;
+}
+.tile svg{width:88%;height:88%}
+.tile:hover .body{transform:translateY(-1px)}
+.tile.sel .body{
+  background:linear-gradient(160deg,#fff8e0,#f7ecc4);
+  border-color:var(--gold);
+  box-shadow:0 0 0 3px var(--gold), 0 5px 12px rgba(0,0,0,.4);
+  transform:translateY(-3px);
+}
+.tile.hint .body{animation:blink 0.7s ease-in-out 3}
+@keyframes blink{50%{box-shadow:0 0 0 4px #ffd23f, 0 5px 12px rgba(0,0,0,.4)}}
+.tile.bad .body{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.tile.gone{opacity:0;pointer-events:none;transform:scale(.85)}
+.tile.gone .body{box-shadow:none}
+.tile:focus-visible .body{outline:3px solid #ffd23f;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.tile,.tile .body{transition:none;animation:none}}
+/* ---------- phone portrait ---------- */
+@media (max-width:640px){
+  body{font-size:16px}
+  #app{padding:10px 8px calc(24px + env(safe-area-inset-bottom))}
+  h1{font-size:24px}
+  #felt{padding:10px;border-radius:14px}
+  #board{gap:4px}
+  .hud{gap:6px;margin-bottom:8px}
+  .hud .btn{padding:9px 13px;font-size:15px}
+  .tile .body{border-radius:7px}
+}
+/* toast + overlay */
+#toast{
+  position:fixed;left:50%;bottom:36px;transform:translateX(-50%) translateY(20px);
+  background:#2b2620;color:#fff;padding:14px 26px;border-radius:14px;font-size:22px;
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;max-width:90vw;text-align:center;z-index:50;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#win{position:fixed;inset:0;background:rgba(43,38,32,.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:60}
+#win .panel{background:var(--paper);border-radius:22px;padding:34px 30px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+#win .big{font-size:52px}
+#win h3{font-size:26px;margin-top:10px}
+#win p{color:var(--ink2);margin-top:8px}
+#win .btns{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+#win .btns button{padding:14px;font-size:19px;border-radius:12px;border:2px solid var(--line);background:#fffdf7;color:var(--ink);cursor:pointer;font-family:inherit}
+#win .btns button.pri{background:linear-gradient(180deg,#c04a3a,var(--red));color:#fff;border:0;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== menu ===== -->
+  <div id="menu">
+    <h1>麻將連連看</h1>
+    <p class="sub">牌面朝上，點兩張<b>一樣</b>的麻將牌<br>能用線連起來（轉彎不超過兩次）就能消掉・不計時，慢慢找</p>
+
+    <div class="sec">
+      <h2>選擇玩法</h2>
+      <div class="grid-btns" id="modes"></div>
+    </div>
+    <div class="sec">
+      <h2>選擇難度</h2>
+      <div class="grid-btns" id="diffs"></div>
+    </div>
+    <div class="sec">
+      <h2>貼心選項</h2>
+      <div class="toggles">
+        <button class="tg on" id="tgVoice"><span>🔊 消牌時語音讀出牌名</span><span class="sw"></span></button>
+        <button class="tg on" id="tgSound"><span>🎵 音效與消牌音樂</span><span class="sw"></span></button>
+      </div>
+    </div>
+    <button class="start" id="startBtn">開始遊戲</button>
+  </div>
+
+  <!-- ===== game ===== -->
+  <div id="game">
+    <div class="hud">
+      <button class="btn" id="backBtn">← 選單</button>
+      <button class="btn" id="shuffleBtn">🔄 重新洗牌</button>
+      <button class="btn" id="hintBtn">💡 提示 ×3</button>
+      <button class="btn" id="restartBtn">重新開始</button>
+      <div class="stat" id="stat"></div>
+    </div>
+    <div id="felt">
+      <div id="board"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+<div id="win"><div class="panel">
+  <div class="big">🏆</div>
+  <h3 id="winTitle">全部消完！</h3>
+  <p id="winMsg"></p>
+  <div class="btns">
+    <button class="pri" id="againBtn">再玩一局</button>
+    <button id="winMenuBtn">回到選單</button>
+  </div>
+</div></div>
+
+<script>
+'use strict';
+/* ================= tile faces (SVG) ================= */
+const INK='#1b2a4a', RED='#b3312c', GRN='#1b6e3c', BLU='#1b4b8c';
+const NUMC=['一','二','三','四','五','六','七','八','九'];
+// 筒子 dot layouts on 3x3 grid (col,row)
+const DOT={
+ 1:[[1,1]], 2:[[1,0],[1,2]], 3:[[0,0],[1,1],[2,2]], 4:[[0,0],[2,0],[0,2],[2,2]],
+ 5:[[0,0],[2,0],[1,1],[0,2],[2,2]], 6:[[0,0],[0,1],[0,2],[2,0],[2,1],[2,2]],
+ 7:[[0,0],[0,1],[0,2],[2,0],[2,1],[2,2],[1,1]],
+ 8:[[0,0],[0,1],[0,2],[2,0],[2,1],[2,2],[1,0],[1,2]],
+ 9:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]]
+};
+const DOTC={1:RED,2:BLU,3:GRN,4:BLU,5:RED,6:GRN,7:BLU,8:GRN,9:RED};
+// 索子 bar layouts
+const BAR={
+ 1:[[1,1]], 2:[[1,0],[1,2]], 3:[[1,0],[0,2],[2,2]], 4:[[0,0],[2,0],[0,2],[2,2]],
+ 5:[[0,0],[2,0],[1,1],[0,2],[2,2]], 6:[[0,0],[0,1],[0,2],[2,0],[2,1],[2,2]],
+ 7:[[1,0],[0,1],[1,1],[2,1],[0,2],[1,2],[2,2]],
+ 8:[[0,0],[1,0],[2,0],[0,1],[2,1],[0,2],[1,2],[2,2]],
+ 9:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]]
+};
+function cx(c){return 12+c*18} function cy(r){return 14+r*22}
+function faceSVG(t){
+  let s='';
+  if(t.s==='m'){
+    s=`<text x="30" y="36" font-size="30" font-weight="700" fill="${INK}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">${NUMC[t.n-1]}</text>`+
+      `<text x="30" y="72" font-size="27" font-weight="700" fill="${RED}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">萬</text>`;
+  } else if(t.s==='p'){
+    const col=DOTC[t.n], r=t.n===1?13:(t.n<=4?8:(t.n<=6?7:6));
+    for(const [c,rr] of DOT[t.n]){
+      s+=`<circle cx="${cx(c)}" cy="${cy(rr)}" r="${r}" fill="${col}" stroke="${col}" stroke-width="1.5"/>`;
+      if(t.n===1) s+=`<circle cx="30" cy="36" r="7" fill="#fff"/><circle cx="30" cy="36" r="4" fill="${GRN}"/>`;
+      else s+=`<circle cx="${cx(c)}" cy="${cy(rr)}" r="${Math.max(2,r-4)}" fill="#fffdf4"/>`;
+    }
+  } else if(t.s==='s'){
+    for(const [c,rr] of BAR[t.n]){
+      const mid=(t.n%2===1&&c===1&&rr===1)||t.n===1;
+      const col=mid?RED:GRN;
+      const x=cx(c)-4.5, y=cy(rr)-11;
+      s+=`<rect x="${x}" y="${y}" width="9" height="22" rx="4" fill="${col}"/>`;
+      s+=`<rect x="${x+1.5}" y="${y+3}" width="6" height="2.5" rx="1.2" fill="#fffdf4" opacity=".7"/>`;
+      s+=`<rect x="${x+1.5}" y="${y+16}" width="6" height="2.5" rx="1.2" fill="#fffdf4" opacity=".7"/>`;
+    }
+  } else {
+    if(t.n===11) s=`<text x="30" y="55" font-size="40" font-weight="700" fill="${BLU}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">東</text>`;
+    else if(t.n===12) s=`<text x="30" y="55" font-size="40" font-weight="700" fill="${BLU}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">南</text>`;
+    else if(t.n===13) s=`<text x="30" y="55" font-size="40" font-weight="700" fill="${BLU}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">西</text>`;
+    else if(t.n===14) s=`<text x="30" y="55" font-size="40" font-weight="700" fill="${BLU}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">北</text>`;
+    else if(t.n===15) s=`<text x="30" y="55" font-size="40" font-weight="700" fill="${RED}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">中</text>`;
+    else if(t.n===16) s=`<text x="30" y="55" font-size="40" font-weight="700" fill="${GRN}" text-anchor="middle" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">發</text>`;
+    else s=`<rect x="10" y="12" width="40" height="52" rx="6" fill="none" stroke="${BLU}" stroke-width="3"/><rect x="16" y="18" width="28" height="40" rx="4" fill="none" stroke="${BLU}" stroke-width="1.5" opacity=".5"/>`;
+  }
+  return `<svg viewBox="0 0 60 80" aria-hidden="true">${s}</svg>`;
+}
+const TYPES=[];
+for(let n=1;n<=9;n++)TYPES.push({s:'m',n});
+for(let n=1;n<=9;n++)TYPES.push({s:'p',n});
+for(let n=1;n<=9;n++)TYPES.push({s:'s',n});
+for(let n=11;n<=17;n++)TYPES.push({s:'z',n});
+function tileName(t){
+  if(t.s==='m')return NUMC[t.n-1]+'萬';
+  if(t.s==='p')return NUMC[t.n-1]+'筒';
+  if(t.s==='s')return NUMC[t.n-1]+'索';
+  return {11:'東風',12:'南風',13:'西風',14:'北風',15:'紅中',16:'發財',17:'白板'}[t.n];
+}
+
+/* ================= config & menu ================= */
+const MODES=[
+  {id:'classic',icon:'🀄',label:'經典連連看',desc:'要用線連得到才消得掉（轉彎≤2次）'},
+  {id:'free',icon:'🧘',label:'輕鬆模式',desc:'看到一樣的兩張就能消，最單純'},
+];
+const DIFFS=[
+  {w:4,h:3,label:'入門',desc:'12 張牌（6 對）— 最輕鬆'},
+  {w:6,h:4,label:'一般',desc:'24 張牌（12 對）— 推薦'},
+  {w:8,h:5,label:'標準',desc:'40 張牌（20 對）'},
+  {w:10,h:6,label:'大師',desc:'60 張牌（30 對）— 挑戰'},
+];
+let sel={mode:'classic',diff:1,voice:true,sound:true};
+const $=id=>document.getElementById(id);
+MODES.forEach((m,i)=>{
+  const b=document.createElement('button');b.className='opt';
+  b.innerHTML=`<span class="big">${m.icon}</span><span><b>${m.label}</b><small>${m.desc}</small></span>`;
+  b.onclick=()=>{sel.mode=m.id;mark('#modes',i)};$('modes').appendChild(b);
+});
+DIFFS.forEach((d,i)=>{
+  const b=document.createElement('button');b.className='opt';
+  b.innerHTML=`<span class="big">${['🌱','🌿','🌳','🏔️'][i]}</span><span><b>${d.label}</b><small>${d.desc}</small></span>`;
+  b.onclick=()=>{sel.diff=i;mark('#diffs',i)};$('diffs').appendChild(b);
+});
+function mark(s_,i){document.querySelectorAll(s_+' .opt').forEach((b,j)=>b.classList.toggle('sel',j===i));}
+mark('#modes',0);mark('#diffs',1);
+function toggle(id,key){$(id).onclick=()=>{sel[key]=!sel[key];$(id).classList.toggle('on',sel[key])};}
+toggle('tgVoice','voice');toggle('tgSound','sound');
+
+/* ================= audio ================= */
+let AC=null;
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC;}
+function tone(f,dur,t0=0,type='sine',gain=.18){
+  const a=ac();if(!a||!sel.sound)return;
+  const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+t0;
+  o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(gain,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur+.05);
+}
+const sTap=()=>tone(420,.06,0,'triangle',.1);
+const sBad=()=>tone(180,.18,0,'sine',.1);
+const sGood=()=>{tone(660,.18);tone(880,.22,.09)};
+const sWin=()=>[523,659,784,1047].forEach((f,i)=>tone(f,.3,i*.12));
+function say(text){
+  if(!sel.voice||!('speechSynthesis'in window))return;
+  try{const u=new SpeechSynthesisUtterance(text);u.lang='zh-TW';u.rate=.92;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}
+}
+
+/* ================= game state ================= */
+let phase='menu', W=6,H=4, grid=[], selIdx=null, lock=false, moves=0, matched=0, total=0, hints=3, mode='classic';
+/* rAF-driven timers (setTimeout is throttled in background tabs) */
+let timers=[];
+function after(ms,fn){timers.push({at:performance.now()+ms,fn});}
+function tick(){
+  const now=performance.now();
+  const due=timers.filter(t=>t.at<=now);
+  if(due.length){timers=timers.filter(t=>t.at>now);due.forEach(t=>{try{t.fn()}catch(e){}});}
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function startGame(seed){
+  const df=DIFFS[sel.diff];W=df.w;H=df.h;mode=sel.mode;
+  const rng=mulberry32(seed===undefined?Math.floor(Math.random()*1e9):seed);
+  const pairs=(W*H)/2;
+  const pool=[...TYPES];
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  // big boards use 4 copies per kind (like real mahjong) — far easier to spot pairs
+  const many=pairs>17;
+  const chosen=pool.slice(0,many?Math.ceil(pairs/2):pairs);
+  grid=[];
+  if(many){let placed=0;while(placed<pairs){for(const t of chosen){if(placed>=pairs)break;grid.push(t,t);placed++;}}}
+  else chosen.forEach(t=>{grid.push(t);grid.push(t);});
+  for(let i=grid.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[grid[i],grid[j]]=[grid[j],grid[i]];}
+  selIdx=null;lock=false;moves=0;matched=0;total=(W*H)/2;hints=3;timers=[];
+  $('win').style.display='none';$('menu').style.display='none';$('game').style.display='block';
+  $('hintBtn').disabled=false;$('hintBtn').textContent='💡 提示 ×3';
+  render();updateHud();phase='play';
+  if(!findPair())shuffleTiles(true);
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+let transp=false;
+const wantTransp=()=>window.innerWidth<=640&&W>H; // phone portrait: wide boards shown rotated (fewer, bigger columns)
+function render(){
+  const board=$('board');
+  transp=wantTransp();
+  const DW=transp?H:W, DH=transp?W:H;
+  board.style.gridTemplateColumns=`repeat(${DW},1fr)`;
+  board.innerHTML='<svg id="pathsvg"></svg>';
+  for(let dr=0;dr<DH;dr++)for(let dc=0;dc<DW;dc++){
+    const i=transp?dc*W+dr:dr*W+dc;
+    const t=grid[i];
+    const b=document.createElement('button');b.className='tile';b.dataset.i=i;
+    if(!t){
+      b.classList.add('gone');b.disabled=true;b.setAttribute('aria-hidden','true');
+      b.setAttribute('aria-label','已消除');
+      board.appendChild(b);continue;
+    }
+    b.setAttribute('aria-label',tileName(t));
+    b.innerHTML=`<div class="body">${faceSVG(t)}</div>`;
+    b.onclick=()=>tap(i);
+    board.appendChild(b);
+  }
+}
+window.addEventListener('resize',()=>{
+  if(phase!=='play')return;
+  if(wantTransp()!==transp){selIdx=null;render();}
+});
+function tileEl(i){return document.querySelector(`.tile[data-i="${i}"]`);}
+function updateHud(){
+  $('stat').textContent=`已消 ${matched} / ${total} 對　・　已點 ${moves} 次　（不計時，慢慢來）`;
+}
+
+/* ================= path finding (≤2 turns) ================= */
+/* expanded coords: board cell (col,row) <-> gx=col+1, gy=row+1; ring gx/gy=0 or W+1/H+1 is empty */
+function isEmpty(gx,gy){
+  if(gx<0||gx>W+1||gy<0||gy>H+1)return false;
+  if(gx===0||gx===W+1||gy===0||gy===H+1)return true;
+  return grid[(gy-1)*W+(gx-1)]===null;
+}
+function findPath(a,b){
+  if(a===b)return null;
+  const ta=grid[a],tb=grid[b];if(!ta||!tb||ta.s!==tb.s||ta.n!==tb.n)return null;
+  const ax=a%W+1,ay=Math.floor(a/W)+1,bx=b%W+1,by=Math.floor(b/W)+1;
+  const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+  const best=new Map();   // key(x,y,dir) -> turns (first visit is minimal by BFS layering)
+  const states=[];        // {x,y,d,turns,parent}
+  const push=(x,y,d,turns,parent)=>{
+    const k=(y*(W+2)+x)*4+d;
+    if(best.has(k))return -1;
+    best.set(k,turns);
+    const idx=states.length;
+    states.push({x,y,d,turns,parent,idx});
+    return idx;
+  };
+  const goals=[];
+  for(let d=0;d<4;d++){ // initial straight rays from A (0 turns)
+    let x=ax+DIRS[d][0],y=ay+DIRS[d][1];
+    for(;;){
+      if(x===bx&&y===by){goals.push(push(x,y,d,0,-1));break;}
+      if(!isEmpty(x,y))break;
+      push(x,y,d,0,-1);
+      x+=DIRS[d][0];y+=DIRS[d][1];
+    }
+  }
+  let frontier=states.slice();
+  for(let turns=0;turns<2&&goals.length===0;turns++){
+    const next=[];
+    for(const s of frontier){
+      if(s.turns!==turns)continue;
+      for(let nd=0;nd<4;nd++){
+        if(nd===s.d||(nd^1)===s.d)continue; // no straight (ray covers it) and no U-turn
+        let x=s.x+DIRS[nd][0],y=s.y+DIRS[nd][1];
+        for(;;){
+          if(x===bx&&y===by){goals.push(push(x,y,nd,turns+1,s.idx));break;}
+          if(!isEmpty(x,y))break;
+          const idx=push(x,y,nd,turns+1,s.idx);
+          if(idx>=0)next.push(states[idx]);
+          x+=DIRS[nd][0];y+=DIRS[nd][1];
+        }
+      }
+    }
+    frontier=next;
+  }
+  if(!goals.length)return null;
+  // reconstruct waypoints (turn points) from the first goal state
+  const pts=[];
+  let cur=goals[0];
+  while(cur!==undefined&&cur!==-1&&cur!==null){const s=states[cur];pts.push([s.x,s.y]);cur=s.parent;}
+  pts.push([ax,ay]);pts.reverse();pts.push([bx,by]);
+  const out=[pts[0]];
+  for(let i=1;i<pts.length;i++){const p=pts[i],q=out[out.length-1];if(p[0]!==q[0]||p[1]!==q[1])out.push(p);}
+  return {a,b,pts:out};
+}
+function drawPath(path){
+  const board=$('board');const svg=$('pathsvg');
+  const DW=transp?H:W, DH=transp?W:H;
+  const bw=board.clientWidth,bh=board.clientHeight;
+  const GAP=parseFloat(getComputedStyle(board).columnGap)||0; // matches live CSS gap
+  const cw=(bw-(DW-1)*GAP)/DW, ch=(bh-(DH-1)*GAP)/DH;
+  const pitchX=cw+GAP, pitchY=ch+GAP;
+  const px=p=>{ // logical expanded coords -> display coords (transpose swaps axes; ring maps to ring)
+    const gx=transp?p[1]:p[0], gy=transp?p[0]:p[1];
+    return [((gx-1)*pitchX+cw/2),((gy-1)*pitchY+ch/2)];
+  };
+  // 1 viewBox unit = 1 client px (svg covers board exactly); outer-ring points rely on overflow:visible
+  svg.setAttribute('viewBox',`0 0 ${bw} ${bh}`);
+  const pts=path.pts.map(px).map(p=>p.join(',')).join(' ');
+  svg.innerHTML=`<polyline points="${pts}" fill="none" stroke="#ffd23f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>`;
+  after(450,()=>{svg.innerHTML='';});
+}
+
+/* ================= interaction ================= */
+function tap(i){
+  if(phase!=='play'||lock)return;
+  const t=grid[i];if(!t)return;
+  ac();
+  if(selIdx===null){selIdx=i;tileEl(i).classList.add('sel');sTap();return;}
+  if(selIdx===i){tileEl(i).classList.remove('sel');selIdx=null;return;}
+  const a=grid[selIdx];
+  if(a.s!==t.s||a.n!==t.n){ // different tile: selection moves
+    tileEl(selIdx).classList.remove('sel');selIdx=i;tileEl(i).classList.add('sel');sTap();return;
+  }
+  // same kind
+  const prev=selIdx;selIdx=null;tileEl(prev).classList.remove('sel');
+  moves++;
+  let path=null;
+  if(mode==='classic'){
+    path=findPath(prev,i);
+    if(!path){
+      tileEl(prev).classList.add('bad');tileEl(i).classList.add('bad');sBad();
+      toast('這兩張連不到——線不能穿過別的牌，轉彎最多兩次',1800);
+      after(350,()=>{tileEl(prev).classList.remove('bad');tileEl(i).classList.remove('bad');});
+      updateHud();return;
+    }
+  }
+  lock=true;
+  if(path)drawPath(path);
+  after(300,()=>{
+    grid[prev]=null;grid[i]=null;matched++;
+    tileEl(prev).classList.add('gone');tileEl(i).classList.add('gone');
+    sGood();say(tileName(t));
+    toast(['消掉了！','好眼力！','找對了！','太棒了！'][Math.floor(Math.random()*4)]+' '+tileName(t),1400);
+    updateHud();lock=false;
+    if(matched===total){win();return;}
+    if(!findPair()){
+      toast('沒有可以連的對了，幫你重新洗牌 🔄',2000);
+      after(900,()=>shuffleTiles(true));
+    }
+  });
+  updateHud();
+}
+function findPair(){
+  const byKind={};
+  grid.forEach((t,i)=>{if(t)(byKind[t.s+t.n]=byKind[t.s+t.n]||[]).push(i);});
+  for(const idxs of Object.values(byKind)){
+    for(let x=0;x<idxs.length;x++)for(let y=x+1;y<idxs.length;y++){
+      if(mode==='free')return[idxs[x],idxs[y]];
+      if(findPath(idxs[x],idxs[y]))return[idxs[x],idxs[y]];
+    }
+  }
+  return null;
+}
+function shuffleTiles(silent){
+  const idxs=[],ts=[];
+  grid.forEach((t,i)=>{if(t){idxs.push(i);ts.push(t);}});
+  if(!idxs.length)return;
+  for(let attempt=0;attempt<60;attempt++){
+    for(let i=ts.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ts[i],ts[j]]=[ts[j],ts[i]];}
+    idxs.forEach((ix,k)=>grid[ix]=ts[k]);
+    if(findPair())break;
+  }
+  selIdx=null;render();updateHud();
+  if(!silent)toast('已重新洗牌 🔄',1200);
+}
+function useHint(){
+  if(phase!=='play'||lock||hints<=0)return;
+  const pair=findPair();if(!pair)return;
+  hints--;$('hintBtn').textContent='💡 提示 ×'+hints;
+  if(hints===0)$('hintBtn').disabled=true;
+  tileEl(pair[0]).classList.add('hint');tileEl(pair[1]).classList.add('hint');
+  sTap();
+  after(2200,()=>{const e0=tileEl(pair[0]),e1=tileEl(pair[1]);if(e0)e0.classList.remove('hint');if(e1)e1.classList.remove('hint');});
+}
+function win(){
+  phase='win';sWin();
+  $('winTitle').textContent='全部消完！';
+  $('winMsg').textContent=`${total} 對麻將牌都找出來了，共點了 ${moves} 次。眼睛越練越亮，明天再來一局！`;
+  say('全部消完了！你真厲害！');
+  $('win').style.display='flex';
+}
+let toastTimer=null;
+function toast(msg,ms=1500){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);after(ms,()=>t.classList.remove('show'));
+}
+function backToMenu(){
+  timers=[];phase='menu';
+  $('win').style.display='none';$('game').style.display='none';$('menu').style.display='block';
+  if('speechSynthesis'in window)try{speechSynthesis.cancel();}catch(e){}
+}
+$('startBtn').onclick=()=>startGame();
+$('backBtn').onclick=backToMenu;
+$('restartBtn').onclick=()=>startGame();
+$('againBtn').onclick=()=>startGame();
+$('winMenuBtn').onclick=backToMenu;
+$('hintBtn').onclick=useHint;
+$('shuffleBtn').onclick=()=>{if(phase==='play'&&!lock)shuffleTiles(false);};
+
+/* ================= test API ================= */
+window.__mg={
+  start:(d,m,seed)=>{sel.diff=d;sel.mode=m||'classic';startGame(seed);},
+  st:()=>({phase,mode,W,H,moves,matched,total,hints,grid:grid.map(t=>t?t.s+t.n:null)}),
+  tap:i=>tap(i), find:()=>findPair(), path:(a,b)=>!!findPath(a,b),
+  set:(arr,w,h)=>{W=w;H=h;grid=arr.map(k=>k?{s:k[0],n:parseInt(k.slice(1),10)}:null);selIdx=null;render();updateHud();},
+  hint:useHint, shuffle:()=>shuffleTiles(false), menu:backToMenu,
+};
+</script>
+<script>
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
