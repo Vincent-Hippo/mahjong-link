@@ -15,6 +15,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Capacitor deps
+        run: npm ci
       - name: Build debug APK
         run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
         working-directory: android
